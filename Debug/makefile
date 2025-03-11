@@ -14,6 +14,12 @@ RM := rm -rf
 -include Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/subdir.mk
 -include Middlewares/Third_Party/FreeRTOS/Source/subdir.mk
 -include Drivers/STM32L4xx_HAL_Driver/Src/subdir.mk
+-include Drivers/BSP/Components/st25dv/subdir.mk
+-include Drivers/BSP/Components/lsm6dsl/subdir.mk
+-include Drivers/BSP/Components/lps22hb/subdir.mk
+-include Drivers/BSP/Components/lis3mdl/subdir.mk
+-include Drivers/BSP/Components/hts221/subdir.mk
+-include Drivers/BSP/B-L4S5I-IOT01/subdir.mk
 -include Core/Startup/subdir.mk
 -include Core/Src/subdir.mk
 -include objects.mk
@@ -64,8 +70,8 @@ all: main-build
 main-build: DEMO_FREERTOS.elf secondary-outputs
 
 # Tool invocations
-DEMO_FREERTOS.elf DEMO_FREERTOS.map: $(OBJS) $(USER_OBJS) C:\Users\rapha\Downloads\DEMO_FREERTOS\STM32L4S5VITX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "DEMO_FREERTOS.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Users\rapha\Downloads\DEMO_FREERTOS\STM32L4S5VITX_FLASH.ld" --specs=nosys.specs -Wl,-Map="DEMO_FREERTOS.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+DEMO_FREERTOS.elf DEMO_FREERTOS.map: $(OBJS) $(USER_OBJS) C:\Sources\LOG550_FREERTOS\STM32L4S5VITX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-gcc -o "DEMO_FREERTOS.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Sources\LOG550_FREERTOS\STM32L4S5VITX_FLASH.ld" --specs=nosys.specs -Wl,-Map="DEMO_FREERTOS.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 
