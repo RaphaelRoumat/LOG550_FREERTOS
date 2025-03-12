@@ -62,17 +62,25 @@ const osThreadAttr_t myLedTask_attributes = {
 /* Definitions for myUartTask */
 osThreadId_t myUartSendTaskHandle;
 const osThreadAttr_t myUartSendTask_attributes = {
-  .name = "myUartTask",
+  .name = "myUartSendTask",
   .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityLow,
 };
 /* Definitions for myCounterTask */
 osThreadId_t myUART_RX_TaskHandle;
 const osThreadAttr_t myUART_RX_TaskHandle_attributes = {
-  .name = "myCounterTask",
+  .name = "myUARTRXTask",
   .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityHigh,
 };
+
+osThreadId_t myADC_Cmd_TaskHandle;
+const osThreadAttr_t myADC_Cmd__TaskHandle_attributes = {
+  .name = "myADCCMDTask",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityHigh,
+};
+
 /* Definitions for myDataQueue */
 osMessageQueueId_t myDataQueueHandle;
 const osMessageQueueAttr_t myDataQueue_attributes = {
@@ -106,6 +114,7 @@ static void MX_USB_OTG_FS_USB_Init(void);
 void LED_flash_task_run(void *argument);
 void UART_RX_task_run(void *argument);
 void UART_send_task_run(void *argument);
+void ADC_CMD_task_run(void *argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -200,6 +209,8 @@ int main(void)
 
   myUartSendTaskHandle = osThreadNew(UART_send_task_run, NULL, &myUartSendTask_attributes);
 
+  myADC_Cmd_TaskHandle = osThreadNew(ADC_CMD_task_run, NULL, &myADC_Cmd__TaskHandle_attributes);
+  osThreadSuspend(myADC_Cmd_TaskHandle);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -1033,16 +1044,56 @@ void UART_RX_task_run(void *argument)
 	uint8_t received_data;
 	HAL_UART_Receive(&huart1, &received_data, 1, 10);
 	if(received_data == 's')
+	{
+		osSemaphoreAcquire(myBinarySem01Handle, osWaitForever);
 		acquisition_activated = 0;
+		osSemaphoreRelease(myBinarySem01Handle);
+		osThreadResume(myADC_Cmd_TaskHandle);
+	}
 	if(received_data == 'x')
 	{
 		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_RESET);
+		osSemaphoreAcquire(myBinarySem01Handle, osWaitForever);
 		acquisition_activated = 1;
+		osSemaphoreRelease(myBinarySem01Handle);
+		osThreadSuspend(myADC_Cmd_TaskHandle);
 	}
 	osDelay(200);
   }
   /* USER CODE END StartMyCounterTask */
 }
+
+#define SOUND_CHANNEL_MASK  0xFE  // 1111 1110
+void ADC_CMD_task_run(void *argument)
+{
+  for(;;)
+  {
+      HAL_ADC_Start(&hadc1);
+
+      // Wait for conversion to complete (blocking)
+      if (HAL_ADC_PollForConversion(&hadc1, HAL_MAX_DELAY) == HAL_OK) {
+          // Read ADC value
+          uint32_t adc_value = HAL_ADC_GetValue(&hadc1);
+          uint8_t encoded_sound = (uint8_t) (adc_value/2);
+          encoded_sound &= SOUND_CHANNEL_MASK;
+          if(osMessageQueueGetSpace(myDataQueueHandle) == 0)
+          {
+        	  //TODO enable AlarmMsgQ
+          }
+          else
+          {
+        	 osStatus_t result = osMessageQueuePut(myDataQueueHandle, &encoded_sound, 0, 10);
+        	 if(result != osOK)
+        	 {
+           	  //TODO enable AlarmMsgQ
+        	 }
+          }
+      }
+	osDelay(2);
+  }
+}
+
+
 
 /**
   * @brief  Period elapsed callback in non blocking mode
