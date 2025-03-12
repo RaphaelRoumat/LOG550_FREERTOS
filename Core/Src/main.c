@@ -57,21 +57,21 @@ osThreadId_t myLedTaskHandle;
 const osThreadAttr_t myLedTask_attributes = {
   .name = "myLedTask",
   .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityNormal,
+  .priority = (osPriority_t) osPriorityLow,
 };
 /* Definitions for myUartTask */
-osThreadId_t myUartTaskHandle;
-const osThreadAttr_t myUartTask_attributes = {
+osThreadId_t myUartSendTaskHandle;
+const osThreadAttr_t myUartSendTask_attributes = {
   .name = "myUartTask",
   .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityLow,
 };
 /* Definitions for myCounterTask */
-osThreadId_t myCounterTaskHandle;
-const osThreadAttr_t myCounterTask_attributes = {
+osThreadId_t myUART_RX_TaskHandle;
+const osThreadAttr_t myUART_RX_TaskHandle_attributes = {
   .name = "myCounterTask",
   .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityLow,
+  .priority = (osPriority_t) osPriorityHigh,
 };
 /* Definitions for myDataQueue */
 osMessageQueueId_t myDataQueueHandle;
@@ -102,13 +102,14 @@ static void MX_USART1_UART_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_USB_OTG_FS_USB_Init(void);
-void StartMyLedTask(void *argument);
-void StartMyUartTask(void *argument);
-void StartMyCounterTask(void *argument);
+
+void LED_flash_task_run(void *argument);
+void UART_RX_task_run(void *argument);
+void UART_send_task_run(void *argument);
 
 /* USER CODE BEGIN PFP */
 
-uint8_t acquisition_activated = 0; // acquistion activated if 0
+uint8_t acquisition_activated = 1; // acquistion activated if 0
 uint8_t queue_overflow_detected = 1; // queue overflow is detected if 0
 
 /* USER CODE END PFP */
@@ -193,14 +194,12 @@ int main(void)
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
-  /* creation of myLedTask */
-  myLedTaskHandle = osThreadNew(StartMyLedTask, NULL, &myLedTask_attributes);
+  myLedTaskHandle = osThreadNew(LED_flash_task_run, NULL, &myLedTask_attributes);
 
-  /* creation of myUartTask */
-  myUartTaskHandle = osThreadNew(StartMyUartTask, NULL, &myUartTask_attributes);
+  myUART_RX_TaskHandle = osThreadNew(UART_RX_task_run, NULL, &myUART_RX_TaskHandle_attributes);
 
-  /* creation of myCounterTask */
-  myCounterTaskHandle = osThreadNew(StartMyCounterTask, NULL, &myCounterTask_attributes);
+  myUartSendTaskHandle = osThreadNew(UART_send_task_run, NULL, &myUartSendTask_attributes);
+
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -959,7 +958,7 @@ static void MX_GPIO_Init(void)
   * @retval None
   */
 /* USER CODE END Header_StartMyLedTask */
-void StartMyLedTask(void *argument)
+void LED_flash_task_run(void *argument)
 {
   /* USER CODE BEGIN 5 */
   /* Infinite loop */
@@ -970,11 +969,14 @@ void StartMyLedTask(void *argument)
   static GPIO_PinState led_1_2_state = GPIO_PIN_RESET;
   for(;;)
   {
+
   if(led_1_2_state == GPIO_PIN_SET)
 	  led_1_2_state = GPIO_PIN_RESET;
   else led_1_2_state = GPIO_PIN_SET;
+
 	osSemaphoreAcquire(myBinarySem01Handle, osWaitForever);
-	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, led_1_2_state);
+
+	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, led_1_2_state); // Toggle
 	if(acquisition_activated == 0)
 		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, led_1_2_state); // Toggle LED 2
 
@@ -982,7 +984,8 @@ void StartMyLedTask(void *argument)
 		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_SET);
 
 	osSemaphoreRelease(myBinarySem01Handle);
-	osDelay(100);  //1sec delay
+
+	osDelay(100);  //100ms delay
   }
   /* USER CODE END 5 */
 }
@@ -994,7 +997,7 @@ void StartMyLedTask(void *argument)
 * @retval None
 */
 /* USER CODE END Header_StartMyUartTask */
-void StartMyUartTask(void *argument)
+void UART_send_task_run(void *argument)
 {
   /* USER CODE BEGIN StartMyUartTask */
   /* Infinite loop */
@@ -1021,15 +1024,22 @@ void StartMyUartTask(void *argument)
 * @retval None
 */
 /* USER CODE END Header_StartMyCounterTask */
-void StartMyCounterTask(void *argument)
+void UART_RX_task_run(void *argument)
 {
   /* USER CODE BEGIN StartMyCounterTask */
   /* Infinite loop */
   for(;;)
   {
-	counter++;
-	osMessageQueuePut(myDataQueueHandle, &counter, 1, osWaitForever);
-	osDelay(5000);
+	uint8_t received_data;
+	HAL_UART_Receive(&huart1, &received_data, 1, 10);
+	if(received_data == 's')
+		acquisition_activated = 0;
+	if(received_data == 'x')
+	{
+		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_RESET);
+		acquisition_activated = 1;
+	}
+	osDelay(200);
   }
   /* USER CODE END StartMyCounterTask */
 }
