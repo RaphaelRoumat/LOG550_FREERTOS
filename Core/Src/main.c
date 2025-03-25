@@ -176,7 +176,7 @@ int main(void)
   MX_USART3_UART_Init();
   MX_USB_OTG_FS_USB_Init();
   /* USER CODE BEGIN 2 */
-
+  BSP_TSENSOR_Init();
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -1065,7 +1065,7 @@ void TEMP_Read(void *argument)
 		temp_value = BSP_TSENSOR_ReadTemp();
 		uint8_t encoded_temp = (uint8_t) (temp_value/2);
 		encoded_temp |= TEMPERATURE_CHANNEL_MASK;
-		osMessageQueuePut(myDataQueueHandle, &encoded_temp, 1, osWaitForever);
+		osMessageQueuePut(myDataQueueHandle, &encoded_temp, 1, 10);
 		osDelay(500);
 	}
 }
