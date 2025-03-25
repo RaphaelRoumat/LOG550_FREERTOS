@@ -851,3 +851,4 @@ VP_SYS_VS_tim6.Signal=SYS_VS_tim6
 board=B-L4S5I-IOT01A
 boardIOC=true
 isbadioc=false
+isbadioc=false

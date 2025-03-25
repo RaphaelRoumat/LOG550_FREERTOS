@@ -15,6 +15,8 @@
 #include "main.h"
 #include "cmsis_os.h"
 
+#include "stm32l4s5i_iot01.h"
+#include "stm32l4s5i_iot01_tsensor.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
@@ -91,6 +93,14 @@ osSemaphoreId_t myBinarySem01Handle;
 const osSemaphoreAttr_t myBinarySem01_attributes = {
   .name = "myBinarySem01"
 };
+
+/* Definitions for myTempReadingTeak */
+osThreadId_t myTempReadingTaskHandle;
+const osThreadAttr_t myTempReadingTaskHandle_attributes = {
+  .name = "myTempReadingTask",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityHigh,
+};
 /* USER CODE BEGIN PV */
 uint16_t counter = 0;
 /* USER CODE END PV */
@@ -114,12 +124,16 @@ static void MX_USB_OTG_FS_USB_Init(void);
 void LED_flash_task_run(void *argument);
 void UART_RX_task_run(void *argument);
 void UART_send_task_run(void *argument);
+void TEMP_Read(void *argument);
 void ADC_CMD_task_run(void *argument);
 
 /* USER CODE BEGIN PFP */
 
 uint8_t acquisition_activated = 1; // acquistion activated if 0
 uint8_t queue_overflow_detected = 1; // queue overflow is detected if 0
+float temp_value = 0.0;
+
+#define TEMPERATURE_CHANNEL_MASK  0x01
 
 /* USER CODE END PFP */
 
@@ -171,7 +185,7 @@ int main(void)
   MX_USART3_UART_Init();
   MX_USB_OTG_FS_USB_Init();
   /* USER CODE BEGIN 2 */
-
+  BSP_TSENSOR_Init();
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -209,6 +223,7 @@ int main(void)
 
   myUartSendTaskHandle = osThreadNew(UART_send_task_run, NULL, &myUartSendTask_attributes);
 
+  myTempReadingTaskHandle = osThreadNew(TEMP_Read,NULL, &myTempReadingTaskHandle_attributes);
   myADC_Cmd_TaskHandle = osThreadNew(ADC_CMD_task_run, NULL, &myADC_Cmd__TaskHandle_attributes);
   osThreadSuspend(myADC_Cmd_TaskHandle);
 
@@ -1061,6 +1076,18 @@ void UART_RX_task_run(void *argument)
 	osDelay(200);
   }
   /* USER CODE END StartMyCounterTask */
+}
+
+
+void TEMP_Read(void *argument)
+{
+	for(;;){
+		temp_value = BSP_TSENSOR_ReadTemp();
+		uint8_t encoded_temp = (uint8_t) (temp_value/2);
+		encoded_temp |= TEMPERATURE_CHANNEL_MASK;
+		osMessageQueuePut(myDataQueueHandle, &encoded_temp, 1, 10);
+		osDelay(500);
+	}
 }
 
 #define SOUND_CHANNEL_MASK  0xFE  // 1111 1110
