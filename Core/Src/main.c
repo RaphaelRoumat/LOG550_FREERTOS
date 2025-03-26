@@ -58,28 +58,28 @@ UART_HandleTypeDef huart3;
 osThreadId_t myLedTaskHandle;
 const osThreadAttr_t myLedTask_attributes = {
   .name = "myLedTask",
-  .stack_size = 128 * 4,
+  .stack_size = 128 * 1,
   .priority = (osPriority_t) osPriorityLow,
 };
 /* Definitions for myUartTask */
 osThreadId_t myUartSendTaskHandle;
 const osThreadAttr_t myUartSendTask_attributes = {
   .name = "myUartSendTask",
-  .stack_size = 128 * 4,
+  .stack_size = 128 * 1,
   .priority = (osPriority_t) osPriorityLow,
 };
 /* Definitions for myCounterTask */
 osThreadId_t myUART_RX_TaskHandle;
 const osThreadAttr_t myUART_RX_TaskHandle_attributes = {
   .name = "myUARTRXTask",
-  .stack_size = 128 * 4,
+  .stack_size = 128 * 1,
   .priority = (osPriority_t) osPriorityHigh,
 };
 
 osThreadId_t myADC_Cmd_TaskHandle;
 const osThreadAttr_t myADC_Cmd__TaskHandle_attributes = {
   .name = "myADCCMDTask",
-  .stack_size = 128 * 4,
+  .stack_size = 128 * 3,
   .priority = (osPriority_t) osPriorityHigh,
 };
 
@@ -98,8 +98,8 @@ const osSemaphoreAttr_t myBinarySem01_attributes = {
 osThreadId_t myTempReadingTaskHandle;
 const osThreadAttr_t myTempReadingTaskHandle_attributes = {
   .name = "myTempReadingTask",
-  .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityHigh,
+  .stack_size = 128 * 3,
+  .priority = (osPriority_t) osPriorityLow,
 };
 /* USER CODE BEGIN PV */
 uint16_t counter = 0;
@@ -210,7 +210,7 @@ int main(void)
 
   /* Create the queue(s) */
   /* creation of myDataQueue */
-  myDataQueueHandle = osMessageQueueNew (2, sizeof(uint16_t), &myDataQueue_attributes);
+  myDataQueueHandle = osMessageQueueNew (2, sizeof(uint8_t), &myDataQueue_attributes);
 
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
@@ -223,8 +223,8 @@ int main(void)
 
   myUartSendTaskHandle = osThreadNew(UART_send_task_run, NULL, &myUartSendTask_attributes);
 
-  myTempReadingTaskHandle = osThreadNew(TEMP_Read,NULL, &myTempReadingTaskHandle_attributes);
   myADC_Cmd_TaskHandle = osThreadNew(ADC_CMD_task_run, NULL, &myADC_Cmd__TaskHandle_attributes);
+  myTempReadingTaskHandle = osThreadNew(TEMP_Read,NULL, &myTempReadingTaskHandle_attributes);
   osThreadSuspend(myADC_Cmd_TaskHandle);
 
   /* USER CODE BEGIN RTOS_THREADS */
@@ -1029,15 +1029,11 @@ void UART_send_task_run(void *argument)
   /* Infinite loop */
   for(;;)
   {
-	uint16_t dataOut;
+	uint8_t dataOut;
 	osStatus_t result = osMessageQueueGet(myDataQueueHandle, &dataOut, NULL, osWaitForever);
 	if(result == osOK)
 	{
-		HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
-		uint8_t buffer[5]="";
-		sprintf((char *)buffer, "%d\n\r", dataOut);
-		HAL_UART_Transmit (&huart1, buffer, sizeof(buffer), 10);
-	    osDelay(1);
+		HAL_UART_Transmit (&huart1, (uint8_t *) &dataOut, sizeof(dataOut), 10);
 	}
   }
   /* USER CODE END StartMyUartTask */
@@ -1086,6 +1082,19 @@ void TEMP_Read(void *argument)
 		uint8_t encoded_temp = (uint8_t) (temp_value/2);
 		encoded_temp |= TEMPERATURE_CHANNEL_MASK;
 		osMessageQueuePut(myDataQueueHandle, &encoded_temp, 1, 10);
+
+		if(osMessageQueueGetSpace(myDataQueueHandle) == 0)
+		  {
+			  //TODO enable AlarmMsgQ
+		  }
+		  else
+		  {
+			osStatus_t result = osMessageQueuePut(myDataQueueHandle, &encoded_temp, 1, 10);
+			if(result != osOK)
+			{
+			  //TODO enable AlarmMsgQ
+			}
+		  }
 		osDelay(500);
 	}
 }
@@ -1109,7 +1118,7 @@ void ADC_CMD_task_run(void *argument)
           }
           else
           {
-        	 osStatus_t result = osMessageQueuePut(myDataQueueHandle, &encoded_sound, 0, 10);
+        	 osStatus_t result = osMessageQueuePut(myDataQueueHandle, &encoded_sound, 1, 10);
         	 if(result != osOK)
         	 {
            	  //TODO enable AlarmMsgQ
