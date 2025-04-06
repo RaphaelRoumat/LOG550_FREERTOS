@@ -94,6 +94,10 @@ const osSemaphoreAttr_t myBinarySem01_attributes = {
   .name = "myBinarySem01"
 };
 
+/* Definitions for alarmSemaphoreHandle */
+osSemaphoreId_t alarmSemaphoreHandle;
+alarmSemaphoreHandle = osSemaphoreNew(1, 0, NULL);
+
 /* Definitions for myTempReadingTeak */
 osThreadId_t myTempReadingTaskHandle;
 const osThreadAttr_t myTempReadingTaskHandle_attributes = {
@@ -1085,14 +1089,14 @@ void TEMP_Read(void *argument)
 
 		if(osMessageQueueGetSpace(myDataQueueHandle) == 0)
 		  {
-			  //TODO enable AlarmMsgQ
+			osSemaphoreRelease(alarmSemaphoreHandle);
 		  }
 		  else
 		  {
 			osStatus_t result = osMessageQueuePut(myDataQueueHandle, &encoded_temp, 1, 10);
 			if(result != osOK)
 			{
-			  //TODO enable AlarmMsgQ
+				osSemaphoreRelease(alarmSemaphoreHandle);
 			}
 		  }
 		osDelay(500);
@@ -1114,19 +1118,29 @@ void ADC_CMD_task_run(void *argument)
           encoded_sound &= SOUND_CHANNEL_MASK;
           if(osMessageQueueGetSpace(myDataQueueHandle) == 0)
           {
-        	  //TODO enable AlarmMsgQ
+        	  osSemaphoreRelease(alarmSemaphoreHandle);
           }
           else
           {
         	 osStatus_t result = osMessageQueuePut(myDataQueueHandle, &encoded_sound, 1, 10);
         	 if(result != osOK)
         	 {
-           	  //TODO enable AlarmMsgQ
+        		 osSemaphoreRelease(alarmSemaphoreHandle);
+
         	 }
           }
       }
 	osDelay(2);
   }
+}
+
+void AlarmMsgQ(void *argument) {
+    for (;;) {
+
+        osSemaphoreAcquire(alarmSemaphoreHandle, osWaitForever);
+
+        queue_overflow_detected = 0;
+    }
 }
 
 
