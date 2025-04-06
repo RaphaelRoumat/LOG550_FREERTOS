@@ -15,11 +15,13 @@
 #include "main.h"
 #include "cmsis_os.h"
 
-#include "stm32l4s5i_iot01.h"
-#include "stm32l4s5i_iot01_tsensor.h"
+
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
+
+#include "stm32l4s5i_iot01.h"
+#include "stm32l4s5i_iot01_tsensor.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -58,28 +60,28 @@ UART_HandleTypeDef huart3;
 osThreadId_t myLedTaskHandle;
 const osThreadAttr_t myLedTask_attributes = {
   .name = "myLedTask",
-  .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityLow,
+  .stack_size = 128 * 2,
+  .priority = (osPriority_t) osPriorityHigh,
 };
 /* Definitions for myUartTask */
 osThreadId_t myUartSendTaskHandle;
 const osThreadAttr_t myUartSendTask_attributes = {
   .name = "myUartSendTask",
-  .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityLow,
+  .stack_size = 128 * 2,
+  .priority = (osPriority_t) osPriorityHigh,
 };
 /* Definitions for myCounterTask */
 osThreadId_t myUART_RX_TaskHandle;
 const osThreadAttr_t myUART_RX_TaskHandle_attributes = {
   .name = "myUARTRXTask",
-  .stack_size = 128 * 4,
+  .stack_size = 128 * 2,
   .priority = (osPriority_t) osPriorityHigh,
 };
 
 osThreadId_t myADC_Cmd_TaskHandle;
 const osThreadAttr_t myADC_Cmd__TaskHandle_attributes = {
   .name = "myADCCMDTask",
-  .stack_size = 128 * 4,
+  .stack_size = 128 * 2,
   .priority = (osPriority_t) osPriorityHigh,
 };
 
@@ -98,8 +100,15 @@ const osSemaphoreAttr_t myBinarySem01_attributes = {
 osThreadId_t myTempReadingTaskHandle;
 const osThreadAttr_t myTempReadingTaskHandle_attributes = {
   .name = "myTempReadingTask",
-  .stack_size = 128 * 4,
+  .stack_size = 128 * 2,
   .priority = (osPriority_t) osPriorityHigh,
+};
+
+osThreadId_t AlarmMsgQ_TaskHandle;
+const osThreadAttr_t AlarmMsgQ_task_attributes = {
+    .name = "AlarmMsgQ",
+    .priority = osPriorityNormal,
+    .stack_size = 512 * 4
 };
 /* USER CODE BEGIN PV */
 uint16_t counter = 0;
@@ -134,6 +143,7 @@ uint8_t queue_overflow_detected = 1; // queue overflow is detected if 0
 float temp_value = 0.0;
 
 #define TEMPERATURE_CHANNEL_MASK  0x01
+#define QUEUE_OVERFLOW_FLAG  0x01
 
 /* USER CODE END PFP */
 
@@ -212,6 +222,9 @@ int main(void)
   /* creation of myDataQueue */
   myDataQueueHandle = osMessageQueueNew (2, sizeof(uint16_t), &myDataQueue_attributes);
 
+  myFlagQueueHandle = osMessageQueueNew (2, sizeof(uint16_t), &myDataQueue_attributes);
+
+
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
   /* USER CODE END RTOS_QUEUES */
@@ -223,9 +236,12 @@ int main(void)
 
   myUartSendTaskHandle = osThreadNew(UART_send_task_run, NULL, &myUartSendTask_attributes);
 
-  myTempReadingTaskHandle = osThreadNew(TEMP_Read,NULL, &myTempReadingTaskHandle_attributes);
   myADC_Cmd_TaskHandle = osThreadNew(ADC_CMD_task_run, NULL, &myADC_Cmd__TaskHandle_attributes);
-  osThreadSuspend(myADC_Cmd_TaskHandle);
+
+  myTempReadingTaskHandle = osThreadNew(TEMP_Read,NULL, &myTempReadingTaskHandle_attributes);
+
+  AlarmMsgQ_TaskHandle = osThreadNew(AlarmMsgQ_task_run, NULL, &AlarmMsgQ_task_attributes);
+  //osThreadSuspend(myADC_Cmd_TaskHandle);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -1105,14 +1121,16 @@ void ADC_CMD_task_run(void *argument)
           encoded_sound &= SOUND_CHANNEL_MASK;
           if(osMessageQueueGetSpace(myDataQueueHandle) == 0)
           {
-        	  //TODO enable AlarmMsgQ
+              if(osMessageQueueGetSpace(myFLAGQueueHandle) == 0)
+            	  osMessageQueuePut(myFLAGQueueHandle, &encoded_sound, 1, 10);
           }
           else
           {
         	 osStatus_t result = osMessageQueuePut(myDataQueueHandle, &encoded_sound, 0, 10);
         	 if(result != osOK)
         	 {
-           	  //TODO enable AlarmMsgQ
+                 if(osMessageQueueGetSpace(myFLAGQueueHandle) == 0)
+               	  osMessageQueuePut(myFLAGQueueHandle, &encoded_sound, 1, 10);
         	 }
           }
       }
@@ -1120,6 +1138,12 @@ void ADC_CMD_task_run(void *argument)
   }
 }
 
+void AlarmMsgQ_task_run(void *argument)
+{
+
+	osStatus_t result = osMessageQueueGet(myFLAGQueueHandle, &dataOut, NULL, osWaitForever);
+	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_9, GPIO_PIN_SET);
+}
 
 
 /**
