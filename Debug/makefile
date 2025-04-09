@@ -70,8 +70,8 @@ all: main-build
 main-build: DEMO_FREERTOS.elf secondary-outputs
 
 # Tool invocations
-DEMO_FREERTOS.elf DEMO_FREERTOS.map: $(OBJS) $(USER_OBJS) C:\Sources\LOG550_FREERTOS\STM32L4S5VITX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "DEMO_FREERTOS.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Sources\LOG550_FREERTOS\STM32L4S5VITX_FLASH.ld" --specs=nosys.specs -Wl,-Map="DEMO_FREERTOS.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+DEMO_FREERTOS.elf DEMO_FREERTOS.map: $(OBJS) $(USER_OBJS) C:\Users\rapha\Downloads\DEMO_FREERTOS\STM32L4S5VITX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-gcc -o "DEMO_FREERTOS.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Users\rapha\Downloads\DEMO_FREERTOS\STM32L4S5VITX_FLASH.ld" --specs=nosys.specs -Wl,-Map="DEMO_FREERTOS.map" -Wl,--gc-sections -static --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 

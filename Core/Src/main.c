@@ -83,6 +83,13 @@ const osThreadAttr_t myADC_Cmd__TaskHandle_attributes = {
   .priority = (osPriority_t) osPriorityHigh,
 };
 
+osThreadId_t myAlarm_TaskHandle;
+const osThreadAttr_t myAlarm__TaskHandle_attributes = {
+  .name = "myAlarmTask",
+  .stack_size = 50,
+  .priority = (osPriority_t) osPriorityHigh,
+};
+
 /* Definitions for myDataQueue */
 osMessageQueueId_t myDataQueueHandle;
 const osMessageQueueAttr_t myDataQueue_attributes = {
@@ -96,7 +103,9 @@ const osSemaphoreAttr_t myBinarySem01_attributes = {
 
 /* Definitions for alarmSemaphoreHandle */
 osSemaphoreId_t alarmSemaphoreHandle;
-alarmSemaphoreHandle = osSemaphoreNew(1, 0, NULL);
+const osSemaphoreAttr_t alarmSem_attributes = {
+  .name = "alarmSem01"
+};
 
 /* Definitions for myTempReadingTeak */
 osThreadId_t myTempReadingTaskHandle;
@@ -130,6 +139,7 @@ void UART_RX_task_run(void *argument);
 void UART_send_task_run(void *argument);
 void TEMP_Read(void *argument);
 void ADC_CMD_task_run(void *argument);
+void AlarmMsgQ(void *argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -203,6 +213,8 @@ int main(void)
   /* creation of myBinarySem01 */
   myBinarySem01Handle = osSemaphoreNew(1, 0, &myBinarySem01_attributes);
 
+  alarmSemaphoreHandle = osSemaphoreNew(1, 0, &alarmSem_attributes);
+
   /* USER CODE BEGIN RTOS_SEMAPHORES */
   /* add semaphores, ... */
 	osSemaphoreRelease(myBinarySem01Handle);
@@ -214,7 +226,7 @@ int main(void)
 
   /* Create the queue(s) */
   /* creation of myDataQueue */
-  myDataQueueHandle = osMessageQueueNew (2, sizeof(uint8_t), &myDataQueue_attributes);
+  myDataQueueHandle = osMessageQueueNew (5, sizeof(uint8_t), &myDataQueue_attributes);
 
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
@@ -229,6 +241,9 @@ int main(void)
 
   myADC_Cmd_TaskHandle = osThreadNew(ADC_CMD_task_run, NULL, &myADC_Cmd__TaskHandle_attributes);
   myTempReadingTaskHandle = osThreadNew(TEMP_Read,NULL, &myTempReadingTaskHandle_attributes);
+
+  myAlarm_TaskHandle = osThreadNew(AlarmMsgQ,NULL, &myAlarm__TaskHandle_attributes);
+
   osThreadSuspend(myADC_Cmd_TaskHandle);
 
   /* USER CODE BEGIN RTOS_THREADS */
@@ -1106,6 +1121,7 @@ void TEMP_Read(void *argument)
 #define SOUND_CHANNEL_MASK  0xFE  // 1111 1110
 void ADC_CMD_task_run(void *argument)
 {
+
   for(;;)
   {
       HAL_ADC_Start(&hadc1);
